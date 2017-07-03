@@ -1,0 +1,301 @@
+# MEAN Contactlist Notes
+
+// Resources
+http://expressjs.com/
+
+
+
+// Use the AngularJS 2 CLI to create a new project:
+    ng new mean-contactlist-angular2
+
+
+// Add polyfills src/main.ts:
+    import './polyfills.ts';
+    import { enableProdMode } from '@angular/core';
+    import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
+
+    import { AppModule } from './app/app.module';
+    import { environment } from './environments/environment';
+
+    if (environment.production) {
+      enableProdMode();
+    }
+
+    platformBrowserDynamic().bootstrapModule(AppModule);
+
+
+// Provision a MongoDB database
+    heroku addons:create mongolab
+
+
+
+
+/*************************************************************
+ *
+ *   Connect MongoDB and the app server using Node.js driver
+ *
+ ************************************************************/
+
+// Create a new file called server.js.
+	touch server.js
+
+// Create server.js file:
+
+	var express = require("express");
+	var bodyParser = require("body-parser");
+	var mongodb = require("mongodb");
+	var ObjectID = mongodb.ObjectID;
+
+	var CONTACTS_COLLECTION = "contacts";
+
+	var app = express();
+	app.use(bodyParser.json());
+
+	// Create a database variable outside of the database connection callback to reuse the connection pool in your app.
+	var db;
+
+	// Connect to the database before starting the application server.
+	mongodb.MongoClient.connect(process.env.MONGODB_URI, function (err, database) {
+	  if (err) {
+		console.log(err);
+		process.exit(1);
+	  }
+
+	  // Save database object from the callback for reuse.
+	  db = database;
+	  console.log("Database connection ready");
+
+	  // Initialize the app.
+	  var server = app.listen(process.env.PORT || 8080, function () {
+		var port = server.address().port;
+		console.log("App now running on port", port);
+	  });
+	});
+
+	// CONTACTS API ROUTES BELOW
+
+
+
+
+/*************************************************************
+ *
+ *   Create a RESTful API server with Node.js and Express
+ *
+ ************************************************************/
+
+
+As our first step in creating the API, we define the endpoints (or data) we want to expose.
+Our contact list app will allow users to perform CRUD operations on their contacts.
+
+/***** The endpoints we’ll need are: *****/
+
+/api/contacts
+
+    Method      Description
+    GET	        Find all contacts
+    POST        Create a new contact
+
+/api/contacts/:id
+
+    Method      Description
+    GET         Find a single contact by ID
+    PUT         Update entire contact document
+    DELETE      Delete a contact by ID
+
+
+/***** Now add the routes to our server.js file: *****/
+
+The code creates a skeleton for all of the
+API endpoints defined above.
+
+    // The code creates a skeleton for all of the API endpoints defined above.
+
+    // CONTACTS API ROUTES BELOW
+
+    // Generic error handler used by all endpoints.
+    function handleError(res, reason, message, code) {
+      console.log("ERROR: " + reason);
+      res.status(code || 500).json({"error": message});
+    }
+
+    /*  "/api/contacts"
+     *    GET: finds all contacts
+     *    POST: creates a new contact
+     */
+
+    app.get("/api/contacts", function(req, res) {
+    });
+
+    app.post("/api/contacts", function(req, res) {
+    });
+
+    /*  "/api/contacts/:id"
+     *    GET: find contact by id
+     *    PUT: update contact by id
+     *    DELETE: deletes contact by id
+     */
+
+    app.get("/api/contacts/:id", function(req, res) {
+    });
+
+    app.put("/api/contacts/:id", function(req, res) {
+    });
+
+    app.delete("/api/contacts/:id", function(req, res) {
+    });
+
+
+
+
+/*************************************************************
+ *
+ *               Implement the API Endpoints
+ *
+ ************************************************************/
+
+/*****     First make sure database is working by    *****/
+/***** implementing GET and POST for '/api/contacts' *****/
+
+//  Contact Schema
+
+    {
+        "_id": <ObjectId>,
+        "name": <string>,
+        "email": <string>,
+        "phone": {
+            "mobile": <string>,
+            "work": <string>
+        }
+    }
+
+
+/*  "/api/contacts"
+ *    GET: finds all contacts
+ *    POST: creates a new contact
+ */
+
+app.get("/api/contacts", function(req, res) {
+    db.collection(CONTACTS_COLLECTION).find({
+        // finds all matching documents, returns a cursor (pointer to result
+        // of query) and then converts to an array of documents
+    }).toArray(function(err, docs) {
+        if (err) {
+            handleError(res, err.message, "Failed to get contacts.");
+        } else {
+            // 200 - OK
+            // json() sets correct headers and applies JSON.stringify()
+            res.status(200).json(docs);
+        };
+    });
+});
+
+app.post("/api/contacts", function(req, res) {
+    // create new contact from request body - req.body contains key-value pairs
+    // of data submitted in the request body. By default, it is undefined, and is
+    // populated when you use body-parsing middleware such as body-parser and multer.
+    var newContact = req.body;
+
+    // if new contact is missing name
+    if (!req.body.name) {
+        handleError(res, "Invalid user input (name)", "Must provide a name.", 400);
+    };
+
+    // insert the new contact
+    db.collection(CONTACTS_COLLECTION).insert(newContact, function(err, doc) {
+        if (err) {
+            handleError(res, err.message, "Failed to create new contact.");
+        } else {
+            // 201 - Created
+            res.status(201).json(doc.ops[0]);
+        };
+    });
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.
