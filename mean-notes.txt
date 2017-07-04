@@ -6,8 +6,10 @@ http://expressjs.com/
 
 
 // Use the AngularJS 2 CLI to create a new project:
+    npm install -g @angular/cli
     ng new mean-contactlist-angular2
-
+    cd mean-contactlist-angular2
+    ng serve
 
 // Add polyfills src/main.ts:
     import './polyfills.ts';
@@ -214,88 +216,533 @@ app.post("/api/contacts", function(req, res) {
 
 
 
+/*************************************************************
+ *
+ *           Set Up the Angular 2 Project Structure
+ *
+ ************************************************************/
 
+// Create a subdirectory called src/app/contacts. 
+// The contacts folder will contain the application logic for displaying and handling contacts.
 
+    mkdir src/app/contacts
 
 
+// Next we’ll create a contact class file that will help us keep our schema 
+// consistent with what we defined previously in the Implement the API endpoints step.
 
+    ng generate class contacts/contact
 
 
+// The contact class will be used by our components. 
+// Each component controls a template and is where we define our application logic.
 
+    ng generate component contacts/contact-details
+    ng generate component contacts/contact-list
 
 
+// Finally, we’ll create an AngularJS 2 service that will be used by our components 
+// to send and receive data.
 
+    ng generate service contacts/contact
 
 
 
 
+/*************************************************************
+ *
+ *                Define the contact class
+ *
+ ************************************************************/
 
+// Navigate to src/app/contacts/contact.ts and insert the following code:
 
+export class Contact {
+    _id?: string;
+    name: string;
+    email: string;
+    phone: {
+        mobile: string;
+        work: string;
+    }
+}
 
 
 
 
+/******************************************************************
+ *
+ * Create the Contact Service to Make Requests to the API Servcer
+ *
+ ******************************************************************/
 
 
+// AngularJS 2 service that will be used by our components to send and receive data.
 
+    ng generate service contacts/contact
 
+// Our service will act as the client-side wrapper for the RESTful API endpoints that the 
+// web application needs. Change your src/app/contacts/contact.service.ts to the following:
 
+/**
+ * At the top of the contact.service.ts file we import the contact class that we created 
+ * along with the built-in AngularJS 2 $http service. By default, $http requests return 
+ * an Angular Observable. To make the $http service easier to work with, we have imported 
+ * the RxJS toPromise operator to allow us to convert the Angular Observable to a Promise.
+ *
+ * Note that with the $http service we use relative URL paths (e.g., “/api/contacts”) as 
+ * opposed to absolute paths like “app-name.herokuapp.com/api/contacts”.
+ **/
 
+import { Injectable } from '@angular/core';
+import { Contact } from './contact';
+import { Http, Response } from '@angular/http';
+import 'rxjs/add/operator/toPromise';
 
+@Injectable()
+export class ContactService {
+    private contactsUrl = '/api/contacts';
 
+    constructor (private http: Http) {}
 
+    // get("/api/contacts")
+    getContacts(): Promise<Contact[]> {
+        return this.http.get(this.contactsUrl)
+                 .toPromise()
+                 .then(response => response.json() as Contact[])
+                 .catch(this.handleError);
+    }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-.
+    // post("/api/contacts")
+    createContact(newContact: Contact): Promise<Contact> {
+        return this.http.post(this.contactsUrl, newContact)
+                 .toPromise()
+                 .then(response => response.json() as Contact)
+                 .catch(this.handleError);
+    }
+
+    // get("/api/contacts/:id") endpoint not used by Angular app
+
+    // delete("/api/contacts/:id")
+    deleteContact(delContactId: String): Promise<String> {
+        return this.http.delete(this.contactsUrl + '/' + delContactId)
+                 .toPromise()
+                 .then(response => response.json() as String)
+                 .catch(this.handleError);
+    }
+
+    // put("/api/contacts/:id")
+    updateContact(putContact: Contact): Promise<Contact> {
+        var putUrl = this.contactsUrl + '/' + putContact._id;
+        return this.http.put(putUrl, putContact)
+                 .toPromise()
+                 .then(response => response.json() as Contact)
+                 .catch(this.handleError);
+    }
+
+    private handleError (error: any) {
+        let errMsg = (error.message) ? error.message :
+        error.status ? `${error.status} - ${error.statusText}` : 'Server error';
+        console.error(errMsg); // log to console instead
+    }
+
+}
+
+
+
+
+/*************************************************************
+ *
+ *     Create the Contact List Template and Component
+ *
+ ************************************************************/
+
+
+// To display a contact list to the user, we’ll need a template (or view) 
+// and the application logic to control that template. Let’s first create 
+// the template by modifying src/app/contacts/contact-list/contact-list.component.html.
+
+<div class="row">
+  <div class="col-md-5">
+    <h2>Contacts</h2>
+    <ul class="list-group">
+      <li class="list-group-item"
+        *ngFor="let contact of contacts"
+        (click)="selectContact(contact)"
+        [class.active]="contact === selectedContact">
+        {{contact.name}}
+      </li>
+    </ul>
+    <button class="btn btn-warning" (click)="createNewContact()">New</button>
+  </div>
+  <div class="col-md-5 col-md-offset-2">
+    <contact-details
+      [contact]="selectedContact"
+      [createHandler]="addContact"
+      [updateHandler]="updateContact"
+      [deleteHandler]="deleteContact">
+    </contact-details>
+  </div>
+</div>
+
+
+// This template displays a contact list and also includes the contact-details 
+// template, which we’ll implement in the next step.
+
+
+/**
+ * Next, we’ll add in our application logic to the contact-list.component.ts file.
+ * 
+ * When the application is initialized, ngOnInit() is called. Upon app start, we use 
+ * contact service to retrieve the full contact list from the API server. Once the 
+ * contact list is retrieved, it is stored into a local copy of the contact list. 
+ * It’s important to store a local copy of the contact list so that we can dynamically 
+ * change the contact list whenever a new user is created, modified, or deleted without 
+ * having to make extra HTTP requests to the API server.
+ **/
+
+import { Component, OnInit } from '@angular/core';
+import { Contact } from '../contact';
+import { ContactService } from '../contact.service';
+import { ContactDetailsComponent } from '../contact-details/contact-details.component';
+
+@Component({
+    selector: 'contact-list',
+    templateUrl: './contact-list.component.html',
+    styleUrls: ['./contact-list.component.css'],
+    providers: [ContactService]
+})
+
+export class ContactListComponent implements OnInit {
+
+    contacts: Contact[]
+    selectedContact: Contact
+
+    constructor(private contactService: ContactService) { }
+
+    ngOnInit() {
+        this.contactService
+            .getContacts()
+            .then((contacts: Contact[]) => {
+                this.contacts = contacts.map((contact) => {
+                    if (!contact.phone) {
+                        contact.phone = {
+                            mobile: '',
+                            work: ''
+                        }
+                    }
+                    return contact;
+                });
+            });
+    }
+
+    private getIndexOfContact = (contactId: String) => {
+        return this.contacts.findIndex((contact) => {
+            return contact._id === contactId;
+        });
+    }
+
+    selectContact(contact: Contact) {
+        this.selectedContact = contact
+    }
+
+    createNewContact() {
+        var contact: Contact = {
+            name: '',
+            email: '',
+            phone: {
+                work: '',
+                mobile: ''
+            }
+        };
+
+        // By default, a newly-created contact will have the selected state.
+        this.selectContact(contact);
+    }
+
+    deleteContact = (contactId: String) => {
+        var idx = this.getIndexOfContact(contactId);
+        if (idx !== -1) {
+            this.contacts.splice(idx, 1);
+            this.selectContact(null);
+        }
+        return this.contacts;
+    }
+
+    addContact = (contact: Contact) => {
+        this.contacts.push(contact);
+        this.selectContact(contact);
+        return this.contacts;
+    }
+
+    updateContact = (contact: Contact) => {
+        var idx = this.getIndexOfContact(contact._id);
+        if (idx !== -1) {
+            this.contacts[idx] = contact;
+            this.selectContact(contact);
+        }
+        return this.contacts;
+    }
+
+}
+
+
+
+
+/*************************************************************
+ *
+ *     Create the Contact Details Template and Component
+ *
+ ************************************************************/
+
+/**
+ * The contact details template allows users to create, view, modify, 
+ * and delete contacts from the contact list. Whenever a change to 
+ * a contact is made, we need to send the update to the server but 
+ * also update our local contact list. Taking a look back at our 
+ * contact-list.component.html code, you’ll notice that we pass in 
+ * some inputs to the contact-details template.
+ **/
+
+ <div class="col-md-5 col-md-offset-2">
+    <contact-details
+        [contact]="selectedContact"
+        [createHandler]="addContact"
+        [updateHandler]="updateContact"
+        [deleteHandler]="deleteContact">
+    </contact-details>
+</div>
+
+/**
+ * The [contact] input corresponds to the particular contact that 
+ * the user clicks on in the UI. The three handler functions are 
+ * necessary to allow the contact-details component to modify the 
+ * local copy of the contact list created by the contact-list component.
+ *
+ * Now we’ll create the contact-details.component.html template.
+ **/
+
+<div *ngIf="contact" class="row">
+  <div class="col-md-12">
+    <h2 *ngIf="contact._id">Contact Details</h2>
+    <h2 *ngIf="!contact._id">New Contact</h2>
+  </div>
+</div>
+<div *ngIf="contact" class="row">
+  <form class="col-md-12">
+    <div class="form-group">
+      <label for="contact-name">Name</label>
+      <input class="form-control" name="contact-name" [(ngModel)]="contact.name" placeholder="Name"/>
+    </div>
+    <div class="form-group">
+      <label for="contact-email">Email</label>
+      <input class="form-control" name="contact-email" [(ngModel)]="contact.email" placeholder="support@mlab.com"/>
+    </div>
+    <div class="form-group">
+      <label for="contact-phone-mobile">Mobile</label>
+      <input class="form-control" name="contact-phone-mobile" [(ngModel)]="contact.phone.mobile" placeholder="1234567890"/>
+    </div>
+    <div class="form-group">
+      <label for="contact-phone-work">Work</label>
+      <input class="form-control" name="contact-phone-work" [(ngModel)]="contact.phone.work" placeholder="0123456789"/>
+    </div>
+    <button class="btn btn-primary" *ngIf="!contact._id" (click)="createContact(contact)">Create</button>
+    <button class="btn btn-info" *ngIf="contact._id" (click)="updateContact(contact)">Update</button>
+    <button class="btn btn-danger" *ngIf="contact._id" (click)="deleteContact(contact._id)">Delete</button>
+  </form>
+</div>
+
+/**
+ * Note that our template calls three functions: 
+ * createContact(), updateContact(), and deleteContact(). 
+ * We’ll need to implement these functions in our component file 
+ * contact-details.component.ts. Let’s change our component file to the following.
+ **/
+
+import { Component, Input } from '@angular/core';
+import { Contact } from '../contact';
+import { ContactService } from '../contact.service';
+
+@Component({
+    selector: 'contact-details',
+    templateUrl: './contact-details.component.html',
+    styleUrls: ['./contact-details.component.css']
+})
+
+export class ContactDetailsComponent {
+  @Input()
+  contact: Contact;
+
+  @Input()
+  createHandler: Function;
+  @Input()
+  updateHandler: Function;
+  @Input()
+  deleteHandler: Function;
+
+  constructor (private contactService: ContactService) {}
+
+  createContact(contact: Contact) {
+    this.contactService.createContact(contact).then((newContact: Contact) => {
+      this.createHandler(newContact);
+    });
+  }
+
+  updateContact(contact: Contact): void {
+    this.contactService.updateContact(contact).then((updatedContact: Contact) => {
+      this.updateHandler(updatedContact);
+    });
+  }
+
+  deleteContact(contactId: String): void {
+    this.contactService.deleteContact(contactId).then((deletedContactId: String) => {
+      this.deleteHandler(deletedContactId);
+    });
+  }
+}
+
+
+
+
+/******************************************************************
+ *
+ *    Update the main app template to display the contact list
+ *
+ *****************************************************************/
+
+/**
+ * With our contact list and contact details components created, we 
+ * now need to configure our app to display these templates to the user. 
+ * The default template is app.component.html, which we’ll change to the following.
+ **/
+
+<div class="container">
+  <contact-list></contact-list>
+</div> 
+
+/**
+ * To add some style to our app, we’ll add bootstrap to our project. 
+ * Add the following line inside the head tag of src/index.html.
+ **/
+
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+
+
+
+/******************************************************************
+ *
+ *    Finalize deployment configuration and deploy to Heroku
+ *
+ *****************************************************************/
+
+
+//With our Angular code finished, we’re now ready to deploy the application. 
+// We’ll need to install the Angular CLI so that our remote Heroku deployment can use it:
+
+    npm install --save @angular/cli @angular/compiler-cli
+
+
+// The finalized package.json file should look like the following.
+
+{
+  "name": "mean-contactlist-angular2",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "ng": "ng",
+    "start": "node server.js",
+    "build": "ng build",
+    "test": "ng test",
+    "lint": "ng lint",
+    "e2e": "ng e2e",
+    "postinstall": "ng build"
+  },
+  "private": true,
+  "dependencies": {
+    "@angular/cli": "1.0.2",
+    "@angular/compiler-cli": "^4.0.0",
+    "@angular/common": "^4.0.0",
+    "@angular/compiler": "^4.0.0",
+    "@angular/core": "^4.0.0",
+    "@angular/forms": "^4.0.0",
+    "@angular/http": "^4.0.0",
+    "@angular/platform-browser": "^4.0.0",
+    "@angular/platform-browser-dynamic": "^4.0.0",
+    "@angular/router": "^4.0.0",
+    "body-parser": "^1.17.1",
+    "core-js": "^2.4.1",
+    "express": "^4.15.2",
+    "mongodb": "^2.2.26",
+    "rxjs": "^5.1.0",
+    "zone.js": "^0.8.4"
+  },
+  "devDependencies": {
+    "@types/jasmine": "2.5.38",
+    "@types/node": "~6.0.60",
+    "codelyzer": "~2.0.0",
+    "jasmine-core": "~2.5.2",
+    "jasmine-spec-reporter": "~3.2.0",
+    "karma": "~1.4.1",
+    "karma-chrome-launcher": "~2.0.0",
+    "karma-cli": "~1.0.1",
+    "karma-jasmine": "~1.1.0",
+    "karma-jasmine-html-reporter": "^0.2.2",
+    "karma-coverage-istanbul-reporter": "^0.2.0",
+    "protractor": "~5.1.0",
+    "ts-node": "~2.0.0",
+    "tslint": "~4.5.0",
+    "typescript": "~2.2.0"
+  }
+}
+
+
+/**
+ * There are a few changes to note. We:
+ *      added “ng build” as a “postinstall” script. This will build the Angular 
+ *          application after library dependencies have been installed.
+ *      changed “start” script from “ng serve” to “node server.js”. 
+ *          The “ng serve” command generates and serves the Angular application. 
+ *      However, our project also consists of the Express API server that we need to run.
+ *
+ * The ng build command stores the Angular build artifacts in the dist/ directory. 
+ * We’ll configure our Express application to serve the Angular app by creating 
+ * a link to the dist/ directory. Modify the server.js code to include the 
+ * last two lines of code:
+
+var express = require("express");
+var bodyParser = require("body-parser");
+var mongodb = require("mongodb");
+var ObjectID = mongodb.ObjectID;
+
+var CONTACTS_COLLECTION = "contacts";
+
+var app = express();
+app.use(bodyParser.json());
+
+// Create link to Angular build directory
+var distDir = __dirname + "/dist/";
+app.use(express.static(distDir));
+
+// Rest of server.js code below
+
+
+
+
+/******************************************************************
+ *
+ *               Complete the Project and Deploy
+ *
+ *****************************************************************/
+
+
+$ git add .
+$ git commit -m 'implement all API endpoints and create angular web app'
+$ git push heroku master
+
+
+// Now that the web application component is complete, you can
+// view your app by opening the website from the CLI:
+
+$ heroku open
